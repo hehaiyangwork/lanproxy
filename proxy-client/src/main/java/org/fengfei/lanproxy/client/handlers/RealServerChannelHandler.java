@@ -1,6 +1,7 @@
 package org.fengfei.lanproxy.client.handlers;
 
 import org.fengfei.lanproxy.client.ClientChannelMannager;
+import org.fengfei.lanproxy.client.Constants;
 import org.fengfei.lanproxy.protocol.ProxyMessage;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,7 +21,7 @@ public class RealServerChannelHandler extends SimpleChannelInboundHandler<ByteBu
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, ByteBuf buf) throws Exception {
         Channel realServerChannel = ctx.channel();
-        Channel channel = ClientChannelMannager.getChannel();
+        Channel channel = realServerChannel.attr(Constants.NEXT_CHANNEL).get();
         if (channel == null) {
             // 代理客户端连接断开
             ctx.channel().close();
@@ -29,7 +30,7 @@ public class RealServerChannelHandler extends SimpleChannelInboundHandler<ByteBu
             buf.readBytes(bytes);
             String userId = ClientChannelMannager.getRealServerChannelUserId(realServerChannel);
             ProxyMessage proxyMessage = new ProxyMessage();
-            proxyMessage.setType(ProxyMessage.TYPE_TRANSFER);
+            proxyMessage.setType(ProxyMessage.P_TYPE_TRANSFER);
             proxyMessage.setUri(userId);
             proxyMessage.setData(bytes);
             channel.writeAndFlush(proxyMessage);
@@ -47,7 +48,7 @@ public class RealServerChannelHandler extends SimpleChannelInboundHandler<ByteBu
         Channel realServerChannel = ctx.channel();
         String userId = ClientChannelMannager.getRealServerChannelUserId(realServerChannel);
         ClientChannelMannager.removeRealServerChannel(userId);
-        Channel channel = ClientChannelMannager.getChannel();
+        Channel channel = realServerChannel.attr(Constants.NEXT_CHANNEL).get();
         if (channel != null) {
             logger.debug("channelInactive, {}", realServerChannel);
             ProxyMessage proxyMessage = new ProxyMessage();
@@ -63,10 +64,10 @@ public class RealServerChannelHandler extends SimpleChannelInboundHandler<ByteBu
     public void channelWritabilityChanged(ChannelHandlerContext ctx) throws Exception {
         Channel realServerChannel = ctx.channel();
         String userId = ClientChannelMannager.getRealServerChannelUserId(realServerChannel);
-        Channel channel = ClientChannelMannager.getChannel();
+        Channel channel = ClientChannelMannager.getCmdChannel();
         if (channel != null) {
             ProxyMessage proxyMessage = new ProxyMessage();
-            proxyMessage.setType(ProxyMessage.TYPE_WRITE_CONTROL);
+            proxyMessage.setType(ProxyMessage.C_TYPE_WRITE_CONTROL);
             proxyMessage.setUri(userId);
             proxyMessage.setData(realServerChannel.isWritable() ? new byte[] { 0x01 } : new byte[] { 0x00 });
             channel.writeAndFlush(proxyMessage);
